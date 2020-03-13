@@ -37,7 +37,7 @@ public class MainActivity extends AppCompatActivity implements
     private EditText priceMessege;
     private EditText textMessage;
 
-    // Переменные для работы с камерой
+
     static final int REQUEST_TAKE_PHOTO = 1;
     private String mCurrentPhotoPath;
     private ImageView imageView;
@@ -48,7 +48,7 @@ public class MainActivity extends AppCompatActivity implements
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        //Инициализация для отображения фото
+
         imageView = findViewById(R.id.imageView);
 
         spMainSelectCategory = (Spinner) findViewById(R.id.selectIdProduct);
