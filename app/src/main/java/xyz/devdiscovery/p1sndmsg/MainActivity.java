@@ -3,12 +3,19 @@ package xyz.devdiscovery.p1sndmsg;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -28,15 +35,23 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathFactory;
+
 public class MainActivity extends AppCompatActivity implements
         OnItemSelectedListener {
 
+    private String bestUrl = "https://www.andr-discovery.xyz/category.xml";
     private Spinner spMainSelectCategory;
     private ArrayList<String> categoryList = new ArrayList<String>();
     private Button buttonSend;
     private EditText priceMessege;
     private EditText textMessage;
-
 
     static final int REQUEST_TAKE_PHOTO = 1;
     private String mCurrentPhotoPath;
@@ -79,9 +94,7 @@ public class MainActivity extends AppCompatActivity implements
         for (int i = 0;  i < list.size(); i++) {
             categoryList.add(list.get(i)[1]);
         }
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(
-                getApplicationContext(), android.R.layout.simple_list_item_1,
-                categoryList);
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(getApplicationContext(), android.R.layout.simple_list_item_1, categoryList);
         adapter.setDropDownViewResource(android.R.layout.simple_list_item_checked);
 
         spMainSelectCategory.setAdapter(adapter);
@@ -191,4 +204,103 @@ public class MainActivity extends AppCompatActivity implements
             }
         }
     }
+
+    // Remount read XML file.
+    private class DownloadPageTask extends
+            AsyncTask<String, Void, List<String>> {
+
+        @Override
+        protected ArrayList<String> doInBackground(String... urls) {
+            try {
+                return downloadOneUrl(urls[0]);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return categoryList;
+        }
+
+        @Override
+        protected void onPostExecute(List<String> result) {
+            spMainSelectCategory.setAdapter(new ArrayAdapter<>(MainActivity.this, android.R.layout.simple_list_item_1, result));
+
+            super.onPostExecute(result);
+        }
+    }
+/*
+    ArrayAdapter<String> adapter = new ArrayAdapter<String>(
+            getApplicationContext(), android.R.layout.simple_list_item_1,
+            categoryList);
+        adapter.setDropDownViewResource(android.R.layout.simple_list_item_checked);
+
+        spMainSelectCategory.setAdapter(adapter);
+        spMainSelectCategory.setOnItemSelectedListener(this);
+*/
+    private ArrayList<String> downloadOneUrl(String myurl) throws
+            Exception {
+        InputStream inputStream = null;
+
+        try {
+            URL url = new URL(myurl);
+            HttpURLConnection connection = (HttpURLConnection) url
+                    .openConnection();
+            connection.setReadTimeout(100000);
+            connection.setConnectTimeout(100000);
+            connection.setRequestMethod("GET");
+            connection.setInstanceFollowRedirects(true);
+            connection.setUseCaches(false);
+            connection.setDoInput(true);
+
+            int responseCode = connection.getResponseCode();
+
+            if (responseCode == HttpURLConnection.HTTP_OK) { // 200 OK
+                inputStream = connection.getInputStream();
+
+                InputSource inputSource = new InputSource(inputStream);
+                // Создаем экземпляр XPath
+                XPath xpath = XPathFactory.newInstance().newXPath();
+                // задаем выражение для разбора
+                String expression = "//title";
+                // список полученных узлов
+                NodeList nodes = (NodeList) xpath.evaluate(expression,
+                        inputSource, XPathConstants.NODESET);
+
+
+                // если узел найден
+                if (nodes != null && nodes.getLength() > 0) {
+                    categoryList.clear();
+                    int nodesLength = nodes.getLength();
+                    for (int i = 0; i < nodesLength; ++i) {
+                        // формируем списочный массив
+                        Node node = nodes.item(i);
+                        categoryList.add(node.getTextContent());
+                    }
+                }
+            } else {
+                String data = connection.getResponseMessage()
+                        + " . Error Code : " + responseCode;
+            }
+            connection.disconnect();
+            // return data;
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (inputStream != null) {
+                inputStream.close();
+            }
+        }
+        return categoryList;
+    }
+
+    public void onClickSpinner(View view) {
+        ConnectivityManager connectivityManager =
+                (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
+
+        if (networkInfo != null && networkInfo.isConnected()) {
+            new DownloadPageTask().execute(bestUrl);
+        } else {
+            Toast.makeText(this, "Нет интернета", Toast.LENGTH_SHORT).show();
+        }
+    }
+
 }
